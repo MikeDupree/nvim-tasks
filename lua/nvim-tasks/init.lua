@@ -52,6 +52,7 @@ local function parse_time_input(input)
 		today.hour = tonumber(hour)
 		today.min = tonumber(min)
 		today.sec = 0
+		-- Ensure the table has all necessary fields set for os.time()
 		return os.date("%Y-%m-%d %H:%M", os.time(today))
 	end
 
@@ -62,6 +63,7 @@ local function parse_time_input(input)
 		t.hour = tonumber(hour)
 		t.min = tonumber(min)
 		t.sec = 0
+		-- Ensure the table has all necessary fields set for os.time()
 		return os.date("%Y-%m-%d %H:%M", os.time(t))
 	end
 
@@ -99,18 +101,60 @@ function M.get_tasks_as_lines()
 	return lines
 end
 
-function M.check_due_tasks()
+local function check_due_tasks()
 	local now = os.time()
 	for _, task in ipairs(read_tasks()) do
 		if task.time and not task.completed then
+			-- Parsing task time into individual components
+			local year, month, day, hour, min
+
+			-- Check if the task has a date in the format "yyyy-mm-dd hh:mm"
+			if task.time:match("^%d%d%d%d%-%d%d%-%d%d") then
+				year = tonumber(task.time:sub(1, 4)) or tonumber(os.date("%Y"))
+				month = tonumber(task.time:sub(6, 7)) or tonumber(os.date("%m"))
+				day = tonumber(task.time:sub(9, 10)) or tonumber(os.date("%d"))
+				hour = tonumber(task.time:sub(12, 13)) or 0
+				min = tonumber(task.time:sub(15, 16)) or 0
+			elseif task.time:match("^today") then
+				local t = os.date("*t")
+				hour = tonumber(task.time:sub(7, 8)) or 0
+				min = tonumber(task.time:sub(10, 11)) or 0
+				year = t.year
+				month = t.month
+				day = t.day
+			elseif task.time:match("^tomorrow") then
+				local t = os.date("*t")
+				hour = tonumber(task.time:sub(10, 11)) or 0
+				min = tonumber(task.time:sub(13, 14)) or 0
+				year = t.year
+				month = t.month
+				day = t.day + 1 -- increment day for tomorrow
+			end
+
+			-- Ensure the year, month, and day are all integers
+			year = tonumber(year) or tonumber(os.date("%Y"))
+			month = tonumber(month) or tonumber(os.date("%m"))
+			day = tonumber(day) or tonumber(os.date("%d"))
+			hour = tonumber(hour) or 0
+			min = tonumber(min) or 0
+
+			-- Ensure no nil values are passed to os.time()
+			if not year or not month or not day then
+				notify("Error: Invalid date for task: " .. task.title, vim.log.levels.ERROR)
+				return
+			end
+
+			-- Create the due date
 			local due = os.time({
-				year = tonumber(task.time:sub(1, 4)),
-				month = tonumber(task.time:sub(6, 7)),
-				day = tonumber(task.time:sub(9, 10)),
-				hour = tonumber(task.time:sub(12, 13)),
-				min = tonumber(task.time:sub(15, 16)),
+				year = year,
+				month = month,
+				day = day,
+				hour = hour,
+				min = min,
 				sec = 0,
+				isdst = false, -- Disable daylight saving time adjustment
 			})
+
 			if math.abs(now - due) < 60 then -- due within the last minute
 				notify("Reminder: " .. task.title, vim.log.levels.INFO, { title = "Task Due" })
 			end

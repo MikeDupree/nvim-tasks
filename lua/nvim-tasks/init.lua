@@ -220,10 +220,10 @@ end
 vim.defer_fn(function()
 	if M.check_due_tasks then
 		M.check_due_tasks()
+		vim.defer_fn(M.check_due_tasks, 60000) -- every 60 seconds
 	else
 		vim.api.nvim_err_writeln("check_due_tasks function is not defined!")
 	end
-	vim.defer_fn(M.check_due_tasks, 60000) -- every 60 seconds
 end, 1000)
 
 return M

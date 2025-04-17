@@ -11,13 +11,7 @@ local conf = require("telescope.config").values
 local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 
-local task_dir = vim.fn.expand("~/.nvim-tasks")
-local task_file = task_dir .. "/tasks.json"
-
--- Ensure task directory exists
-if vim.fn.isdirectory(task_dir) == 0 then
-	vim.fn.mkdir(task_dir, "p")
-end
+local task_file = vim.fn.expand("~/.nvim-tasks/tasks.json")
 
 local function read_tasks()
 	local fd = uv.fs_open(task_file, "r", 438)
@@ -31,12 +25,47 @@ local function read_tasks()
 end
 
 local function write_tasks(tasks)
+	uv.fs_mkdir(vim.fn.expand("~/.nvim-tasks"), 493, function() end) -- create dir if needed
 	local fd = uv.fs_open(task_file, "w", 438)
 	if not fd then
 		return
 	end
 	uv.fs_write(fd, encode(tasks), 0)
 	uv.fs_close(fd)
+end
+
+local function parse_time_input(input)
+	if not input then
+		return nil
+	end
+	local now = os.time()
+
+	if input:match("^%d+[hd]$") then
+		local amount, unit = input:match("^(%d+)([hd])$")
+		local seconds = unit == "h" and tonumber(amount) * 3600 or tonumber(amount) * 86400
+		return os.date("%Y-%m-%d %H:%M", now + seconds)
+	end
+
+	if input:match("^today %d%d:%d%d$") then
+		local hour, min = input:match("today (%d%d):(%d%d)")
+		local today = os.date("*t")
+		today.hour = tonumber(hour)
+		today.min = tonumber(min)
+		today.sec = 0
+		return os.date("%Y-%m-%d %H:%M", os.time(today))
+	end
+
+	if input:match("^tomorrow %d%d:%d%d$") then
+		local hour, min = input:match("tomorrow (%d%d):(%d%d)")
+		local t = os.date("*t")
+		t.day = t.day + 1
+		t.hour = tonumber(hour)
+		t.min = tonumber(min)
+		t.sec = 0
+		return os.date("%Y-%m-%d %H:%M", os.time(t))
+	end
+
+	return input
 end
 
 function M.add_task(title, time)
@@ -124,20 +153,24 @@ function M.prompt_add_task()
 		if not title then
 			return
 		end
-		vim.ui.input({ prompt = "Optional time (YYYY-MM-DD HH:MM): " }, function(time)
-			M.add_task(title, time)
+		vim.ui.input({ prompt = "Optional time (e.g. '3h', 'today 10:00'): " }, function(time)
+			local parsed_time = parse_time_input(time)
+			M.add_task(title, parsed_time)
 		end)
 	end)
 end
 
 -- Commands
-vim.api.nvim_create_user_command("AddTask", function()
-	M.prompt_add_task()
-end, {})
+if not vim.g.tasks_commands_loaded then
+	vim.api.nvim_create_user_command("AddTask", function()
+		M.prompt_add_task()
+	end, {})
 
-vim.api.nvim_create_user_command("ShowTasks", function()
-	M.show_tasks()
-end, {})
+	vim.api.nvim_create_user_command("ShowTasks", function()
+		M.show_tasks()
+	end, {})
+	vim.g.tasks_commands_loaded = true
+end
 
 -- Schedule to check every minute
 vim.defer_fn(function()

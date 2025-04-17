@@ -3,11 +3,10 @@
 A lightweight task manager plugin for Neovim written in Lua — with Telescope integration, simple due-date reminders, and quick task creation.
 
 ## ✨ Features
-
-- Add tasks quickly using `:AddTask`
-- View and toggle tasks using `:ShowTasks`
-- Optional scheduling — get reminded in Neovim
-- Uses JSON to persist tasks at `~/.nvim-notes/tasks.json`
+- `:AddTask`: Add a task with optional time (3h, tomorrow 12:00, etc)
+- `:ShowTasks`: View tasks in Telescope UI and toggle them as done
+- 🕐 Due tasks show reminders via `vim.notify` when it's time
+- 📁 Tasks saved in `~/.nvim-tasks/tasks.json`
 - Works with [Telescope.nvim](https://github.com/nvim-telescope/telescope.nvim)
 
 ## 📦 Installation
